@@ -182,6 +182,7 @@
     <Compile Include="Toolbar\SplitButton\SplitButton.cs" />
     <Compile Include="Windows\ControlBox.cs" />
     <Compile Include="Windows\SnappingWindow.cs" />
+    <Compile Include="Windows\WindowInformation.cs" />
   </ItemGroup>
   <ItemGroup>
     <Page Include="HtmlLabelControl\HtmlLabel.xaml">

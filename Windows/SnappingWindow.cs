@@ -17,6 +17,7 @@ namespace Common.Wpf.Windows
 
         private HwndSource _hwndSource;
         private Structures.WindowPosition _lastWindowPosition;
+        private List<WindowInformation> _otherWindows;
 
         #endregion
 
@@ -37,7 +38,7 @@ namespace Common.Wpf.Windows
             get { return 20; }
         }
 
-        protected virtual List<Rect> OtherWindows
+        protected virtual List<WindowInformation> OtherWindows
         {
             get { return null; }
         }
@@ -88,10 +89,13 @@ namespace Common.Wpf.Windows
 
         #region Window procedure
 
-        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        protected virtual IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             if (msg == (int) Constants.WindowMessage.WindowPositionChanging)
                 return OnWindowPositionChanging(lParam, ref handled);
+
+            if (msg == (int) Constants.WindowMessage.EnterSizeMove)
+                _otherWindows = OtherWindows;
 
             return IntPtr.Zero;
         }
@@ -197,15 +201,15 @@ namespace Common.Wpf.Windows
                 }
             }
 
-            var otherWindows = OtherWindows;
+            var otherWindows = _otherWindows;
 
             if (otherWindows != null && otherWindows.Count > 0)
             {
                 // Loop over all other windows looking to see if we should stick
-                foreach (Rect otherWindow in otherWindows)
+                foreach (var otherWindow in otherWindows)
                 {
                     // Get a rectangle with the bounds of the other window
-                    var otherWindowRect = new Rectangle(Convert.ToInt32(otherWindow.Left), Convert.ToInt32(otherWindow.Top), Convert.ToInt32(otherWindow.Width), Convert.ToInt32(otherWindow.Height));
+                    var otherWindowRect = otherWindow.Location;                        
 
                     // Check the current window left against the other window right
                     var otherWindowSnapBorder = new Rectangle(otherWindowRect.Right, otherWindowRect.Top, snapDistance, otherWindowRect.Height);
