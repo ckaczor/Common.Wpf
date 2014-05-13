@@ -21,6 +21,55 @@ namespace Common.Wpf.Windows
 
         #endregion
 
+        private class WindowBorderRectangles
+        {
+            public WindowBorderRectangles(Rectangle windowPosition, int width, bool inside)
+            {
+                var offset = inside ? width : 0;
+                var actualWidth = inside ? width * 2 : width;
+
+                Top = new Rectangle(windowPosition.Left, windowPosition.Top - offset, windowPosition.Width, actualWidth);
+                Bottom = new Rectangle(windowPosition.Left, windowPosition.Bottom - offset, windowPosition.Width, actualWidth);
+                Left = new Rectangle(windowPosition.Left - offset, windowPosition.Top, actualWidth, windowPosition.Height);
+                Right = new Rectangle(windowPosition.Right - offset, windowPosition.Top, actualWidth, windowPosition.Height);
+            }
+
+            public WindowBorderRectangles(Structures.WindowPosition windowPosition, int width, bool inside)
+            {
+                var offset = inside ? width : 0;
+                var actualWidth = inside ? width * 2 : width;
+
+                Top = new Rectangle(windowPosition.Left, windowPosition.Top - offset, windowPosition.Width, actualWidth);
+                Bottom = new Rectangle(windowPosition.Left, windowPosition.Bottom - offset, windowPosition.Width, actualWidth);
+                Left = new Rectangle(windowPosition.Left - offset, windowPosition.Top, actualWidth, windowPosition.Height);
+                Right = new Rectangle(windowPosition.Right - offset, windowPosition.Top, actualWidth, windowPosition.Height);
+            }
+
+            public Rectangle Top { get; private set; }
+            public Rectangle Bottom { get; private set; }
+            public Rectangle Left { get; private set; }
+            public Rectangle Right { get; private set; }
+        }
+
+        private class ResizeSide
+        {
+            public ResizeSide(Structures.WindowPosition position1, Structures.WindowPosition position2)
+            {
+                if (position1.IsSameSize(position2))
+                    return;
+
+                IsTop = (position1.Top != position2.Top);
+                IsBottom = (position1.Bottom != position2.Bottom);
+                IsLeft = (position1.Left != position2.Left);
+                IsRight = (position1.Right != position2.Right);
+            }
+
+            public bool IsTop { get; private set; }
+            public bool IsBottom { get; private set; }
+            public bool IsLeft { get; private set; }
+            public bool IsRight { get; private set; }
+        }
+
         #region Enumerations
 
         private enum SnapMode
@@ -62,20 +111,6 @@ namespace Common.Wpf.Windows
             _hwndSource.AddHook(WndProc);
         }
 
-        protected override void OnContentRendered(EventArgs e)
-        {
-            base.OnContentRendered(e);
-
-            // Initialize the last window position
-            _lastWindowPosition = new Structures.WindowPosition
-            {
-                Left = (int) Left,
-                Width = (int) Width,
-                Height = (int) Height,
-                Top = (int) Top
-            };
-        }
-
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
@@ -91,11 +126,30 @@ namespace Common.Wpf.Windows
 
         protected virtual IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            if (msg == (int) Constants.WindowMessage.WindowPositionChanging)
-                return OnWindowPositionChanging(lParam, ref handled);
+            switch (msg)
+            {
+                case (int) Constants.WindowMessage.WindowPositionChanging:
+                    return OnWindowPositionChanging(lParam, ref handled);
 
-            if (msg == (int) Constants.WindowMessage.EnterSizeMove)
-                _otherWindows = OtherWindows;
+                case (int) Constants.WindowMessage.EnterSizeMove:
+
+                    // Initialize the last window position
+                    _lastWindowPosition = new Structures.WindowPosition
+                    {
+                        Left = (int) Left,
+                        Width = (int) Width,
+                        Height = (int) Height,
+                        Top = (int) Top
+                    };
+
+                    // Store the current other windows
+                    _otherWindows = OtherWindows;
+
+                    break;
+
+                case (int) Constants.WindowMessage.ExitSizeMove:
+                    break;
+            }
 
             return IntPtr.Zero;
         }
@@ -123,7 +177,10 @@ namespace Common.Wpf.Windows
                 return IntPtr.Zero;
 
             // Figure out if the window is being moved or resized
-            SnapMode snapMode = (_lastWindowPosition.IsSameSize(windowPosition) ? SnapMode.Move : SnapMode.Resize);
+            var snapMode = (_lastWindowPosition.IsSameSize(windowPosition) ? SnapMode.Move : SnapMode.Resize);
+
+            // Figure out what side is resizing
+            var resizeSide = new ResizeSide(windowPosition, _lastWindowPosition);
 
             // Get the screen the cursor is currently on
             Screen screen = Screen.FromPoint(System.Windows.Forms.Cursor.Position);
@@ -205,54 +262,177 @@ namespace Common.Wpf.Windows
 
             if (otherWindows != null && otherWindows.Count > 0)
             {
+                // Get the snap source rectangles for the window being changed
+                var sourceRectanges = new WindowBorderRectangles(windowPosition, 1, false);
+
                 // Loop over all other windows looking to see if we should stick
                 foreach (var otherWindow in otherWindows)
                 {
                     // Get a rectangle with the bounds of the other window
-                    var otherWindowRect = otherWindow.Location;                        
+                    var otherWindowRect = otherWindow.Location;
 
-                    // Check the current window left against the other window right
-                    var otherWindowSnapBorder = new Rectangle(otherWindowRect.Right, otherWindowRect.Top, snapDistance, otherWindowRect.Height);
-                    var thisWindowSnapBorder = new Rectangle(windowPosition.Left, windowPosition.Top, 1, windowPosition.Height);
+                    // Get the snap target rectangles for the current window
+                    var targetRectangles = new WindowBorderRectangles(otherWindow.Location, snapDistance, true);
 
-                    if (thisWindowSnapBorder.IntersectsWith(otherWindowSnapBorder))
+                    if (snapMode == SnapMode.Move)
                     {
-                        windowPosition.Left = otherWindowRect.Right;
-                        CheckSnapTopAndBottom(ref windowPosition, otherWindowRect, snapMode);
-                        updated = true;
+                        if (sourceRectanges.Left.IntersectsWith(targetRectangles.Right))
+                        {
+                            windowPosition.Left = otherWindowRect.Right;
+                            updated = true;
+                        }
+
+                        if (sourceRectanges.Right.IntersectsWith(targetRectangles.Left))
+                        {
+                            windowPosition.Left = otherWindowRect.Left - windowPosition.Width;
+                            updated = true;
+                        }
+
+                        if (sourceRectanges.Top.IntersectsWith(targetRectangles.Bottom))
+                        {
+                            windowPosition.Top = otherWindowRect.Bottom;
+                            updated = true;
+                        }
+
+                        if (sourceRectanges.Bottom.IntersectsWith(targetRectangles.Top))
+                        {
+                            windowPosition.Top = otherWindowRect.Top - windowPosition.Height;
+                            updated = true;
+                        }
+
+                        if (windowPosition.Top == otherWindowRect.Bottom || windowPosition.Bottom == otherWindowRect.Top)
+                        {
+                            if (Math.Abs(windowPosition.Left - otherWindowRect.Left) <= snapDistance)
+                            {
+                                windowPosition.Left = otherWindowRect.Left;
+
+                                updated = true;
+                            }
+
+                            if (Math.Abs(windowPosition.Right - otherWindowRect.Right) <= snapDistance)
+                            {
+                                windowPosition.Left = otherWindowRect.Right - windowPosition.Width;
+
+                                updated = true;
+                            }
+                        }
+
+                        if (windowPosition.Left == otherWindowRect.Right || windowPosition.Right == otherWindowRect.Left)
+                        {
+                            if (Math.Abs(otherWindowRect.Bottom - windowPosition.Bottom) <= snapDistance)
+                            {
+                                windowPosition.Top = otherWindowRect.Bottom - windowPosition.Height;
+
+                                updated = true;
+                            }
+
+                            if (Math.Abs(otherWindowRect.Top - windowPosition.Top) <= snapDistance)
+                            {
+                                windowPosition.Top = otherWindowRect.Top;
+
+                                updated = true;
+                            }
+                        }
                     }
-
-                    // Check the current window right against the other window left
-                    otherWindowSnapBorder = new Rectangle(otherWindowRect.Left - snapDistance + 1, otherWindowRect.Top, snapDistance, otherWindowRect.Height);
-                    thisWindowSnapBorder = new Rectangle(windowPosition.Right, windowPosition.Top, 1, windowPosition.Height);
-
-                    if (thisWindowSnapBorder.IntersectsWith(otherWindowSnapBorder))
+                    else
                     {
-                        windowPosition.Left = otherWindowRect.Left - windowPosition.Width;
-                        CheckSnapTopAndBottom(ref windowPosition, otherWindowRect, snapMode);
-                        updated = true;
-                    }
+                        if (resizeSide.IsLeft)
+                        {
+                            // Check the current window left against the other window right
+                            if (sourceRectanges.Left.IntersectsWith(targetRectangles.Right))
+                            {
+                                var sign = windowPosition.Left < otherWindowRect.Right ? -1 : 1;
 
-                    // Check the current window bottom against the other window top
-                    otherWindowSnapBorder = new Rectangle(otherWindowRect.Left, otherWindowRect.Top - snapDistance + 1, otherWindowRect.Width, snapDistance);
-                    thisWindowSnapBorder = new Rectangle(windowPosition.Left, windowPosition.Bottom, windowPosition.Width, 1);
+                                windowPosition.Width += Math.Abs(otherWindowRect.Right - windowPosition.Left) * sign;
+                                windowPosition.Left = otherWindowRect.Right;
 
-                    if (thisWindowSnapBorder.IntersectsWith(otherWindowSnapBorder))
-                    {
-                        windowPosition.Top = otherWindowRect.Top - windowPosition.Height;
-                        CheckSnapLeftAndRight(ref windowPosition, otherWindowRect, snapMode);
-                        updated = true;
-                    }
+                                updated = true;
+                            }
+                            else if (windowPosition.Top == otherWindowRect.Bottom || windowPosition.Bottom == otherWindowRect.Top)
+                            {
+                                if (Math.Abs(windowPosition.Left - otherWindowRect.Left) <= snapDistance)
+                                {
+                                    var sign = windowPosition.Left < otherWindowRect.Left ? -1 : 1;
 
-                    // Check the current window top against the other window bottom
-                    otherWindowSnapBorder = new Rectangle(otherWindowRect.Left, otherWindowRect.Bottom, otherWindowRect.Width, snapDistance);
-                    thisWindowSnapBorder = new Rectangle(windowPosition.Left, windowPosition.Top, windowPosition.Width, 1);
+                                    windowPosition.Width += Math.Abs(otherWindowRect.Left - windowPosition.Left) * sign;
+                                    windowPosition.Left = otherWindowRect.Left;
 
-                    if (thisWindowSnapBorder.IntersectsWith(otherWindowSnapBorder))
-                    {
-                        windowPosition.Top = otherWindowRect.Bottom;
-                        CheckSnapLeftAndRight(ref windowPosition, otherWindowRect, snapMode);
-                        updated = true;
+                                    updated = true;
+                                }
+                            }
+                        }
+                        else if (resizeSide.IsRight)
+                        {
+                            // Check the current window right against the other window left
+                            if (sourceRectanges.Right.IntersectsWith(targetRectangles.Left))
+                            {
+                                var sign = windowPosition.Right < otherWindowRect.Left ? 1 : -1;
+
+                                windowPosition.Width += Math.Abs(otherWindowRect.Left - windowPosition.Right) * sign;
+
+                                updated = true;
+                            }
+                            else if (windowPosition.Top == otherWindowRect.Bottom || windowPosition.Bottom == otherWindowRect.Top)
+                            {
+                                if (Math.Abs(windowPosition.Right - otherWindowRect.Right) <= snapDistance)
+                                {
+                                    var sign = windowPosition.Right < otherWindowRect.Right ? 1 : -1;
+
+                                    windowPosition.Width += Math.Abs(otherWindowRect.Right - windowPosition.Right) * sign;
+
+                                    updated = true;
+                                }
+                            }
+                        }
+
+                        if (resizeSide.IsBottom)
+                        {
+                            // Check the current window bottom against the other window top
+                            if (sourceRectanges.Bottom.IntersectsWith(targetRectangles.Top))
+                            {
+                                var sign = windowPosition.Bottom < otherWindowRect.Top ? 1 : -1;
+
+                                windowPosition.Height += Math.Abs(otherWindowRect.Top - windowPosition.Bottom) * sign;
+
+                                updated = true;
+                            }
+                            else if (windowPosition.Left == otherWindowRect.Right || windowPosition.Right == otherWindowRect.Left)
+                            {
+                                if (Math.Abs(otherWindowRect.Bottom - windowPosition.Bottom) <= snapDistance)
+                                {
+                                    var sign = windowPosition.Bottom < otherWindowRect.Bottom ? 1 : -1;
+
+                                    windowPosition.Height += Math.Abs(otherWindowRect.Bottom - windowPosition.Bottom) * sign;
+
+                                    updated = true;
+                                }
+                            }
+                        }
+                        else if (resizeSide.IsTop)
+                        {
+                            // Check the current window top against the other window bottom
+                            if (sourceRectanges.Top.IntersectsWith(targetRectangles.Bottom))
+                            {
+                                var sign = windowPosition.Top < otherWindowRect.Bottom ? 1 : -1;
+
+                                windowPosition.Height -= Math.Abs(otherWindowRect.Bottom - windowPosition.Top) * sign;
+                                windowPosition.Top = otherWindowRect.Bottom;
+
+                                updated = true;
+                            }
+                            else if (windowPosition.Left == otherWindowRect.Right || windowPosition.Right == otherWindowRect.Left)
+                            {
+                                if (Math.Abs(otherWindowRect.Top - windowPosition.Top) <= snapDistance)
+                                {
+                                    var sign = windowPosition.Top < otherWindowRect.Top ? -1 : 1;
+
+                                    windowPosition.Height += Math.Abs(otherWindowRect.Top - windowPosition.Top) * sign;
+                                    windowPosition.Top = otherWindowRect.Top;
+
+                                    updated = true;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -267,60 +447,6 @@ namespace Common.Wpf.Windows
             }
 
             return IntPtr.Zero;
-        }
-
-        private void CheckSnapTopAndBottom(ref Structures.WindowPosition windowPosition, Rectangle otherWindowRect, SnapMode snapMode)
-        {
-            int snapDistance = SnapDistance;
-
-            switch (snapMode)
-            {
-                case SnapMode.Move:
-                    if (Math.Abs(windowPosition.Top - otherWindowRect.Top) <= snapDistance)
-                        windowPosition.Top = otherWindowRect.Top;
-                    else if (Math.Abs(windowPosition.Bottom - otherWindowRect.Bottom) <= snapDistance)
-                        windowPosition.Top = otherWindowRect.Bottom - windowPosition.Height;
-
-                    break;
-                case SnapMode.Resize:
-                    if (Math.Abs(windowPosition.Top - otherWindowRect.Top) <= snapDistance)
-                    {
-                        windowPosition.Height += (windowPosition.Top - otherWindowRect.Top);
-                        windowPosition.Top = otherWindowRect.Top;
-                    }
-                    else
-                        if (Math.Abs(windowPosition.Bottom - otherWindowRect.Bottom) <= snapDistance)
-                            windowPosition.Height = otherWindowRect.Bottom - windowPosition.Top;
-
-                    break;
-            }
-        }
-
-        private void CheckSnapLeftAndRight(ref Structures.WindowPosition windowPosition, Rectangle otherWindowRect, SnapMode snapMode)
-        {
-            int snapDistance = SnapDistance;
-
-            switch (snapMode)
-            {
-                case SnapMode.Move:
-                    if (Math.Abs(windowPosition.Left - otherWindowRect.Left) <= snapDistance)
-                        windowPosition.Left = otherWindowRect.Left;
-                    else if (Math.Abs(windowPosition.Right - otherWindowRect.Right) <= snapDistance)
-                        windowPosition.Left = otherWindowRect.Right - windowPosition.Width;
-
-                    break;
-                case SnapMode.Resize:
-                    if (Math.Abs(windowPosition.Left - otherWindowRect.Left) <= snapDistance)
-                    {
-                        windowPosition.Width += (windowPosition.Left - otherWindowRect.Left);
-                        windowPosition.Left = otherWindowRect.Left;
-                    }
-                    else
-                        if (Math.Abs(windowPosition.Right - otherWindowRect.Right) <= snapDistance)
-                            windowPosition.Width = otherWindowRect.Right - windowPosition.Left;
-
-                    break;
-            }
         }
 
         #endregion
