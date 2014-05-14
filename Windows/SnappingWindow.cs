@@ -16,6 +16,7 @@ namespace Common.Wpf.Windows
         #region Member variables
 
         private HwndSource _hwndSource;
+        private bool _inSizeMove;
         private Structures.WindowPosition _lastWindowPosition;
         private List<WindowInformation> _otherWindows;
 
@@ -145,9 +146,13 @@ namespace Common.Wpf.Windows
                     // Store the current other windows
                     _otherWindows = OtherWindows;
 
+                    _inSizeMove = true;
+
                     break;
 
                 case (int) Constants.WindowMessage.ExitSizeMove:
+                    _inSizeMove = false;
+
                     break;
             }
 
@@ -160,6 +165,9 @@ namespace Common.Wpf.Windows
 
         private IntPtr OnWindowPositionChanging(IntPtr lParam, ref bool handled)
         {
+            if (!_inSizeMove)
+                return IntPtr.Zero;
+
             int snapDistance = SnapDistance;
 
             // Initialize whether we've updated the position
