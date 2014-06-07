@@ -8,95 +8,128 @@ using System.Windows.Media;
 
 namespace Common.Wpf.Extensions
 {
+    public class BindingExpressionInfo
+    {
+        public FrameworkElement FrameworkElement { get; private set; }
+        public BindingExpression BindingExpression { get; private set; }
+
+        public BindingExpressionInfo(FrameworkElement frameworkElement, BindingExpression bindingExpression)
+        {
+            FrameworkElement = frameworkElement;
+            BindingExpression = bindingExpression;
+        }
+    }
+
     public static class WindowExtensions
     {
-        public static Dictionary<FrameworkElement, BindingExpression> GetExplicitBindingExpressions(this DependencyObject parent)
+        public static List<BindingExpressionInfo> GetBindingExpressions(this DependencyObject parent)
         {
-            // Create a dictionary of framework elements and binding expressions
-            Dictionary<FrameworkElement, BindingExpression> bindingExpressions = new Dictionary<FrameworkElement, BindingExpression>();
+            return GetBindingExpressions(parent, null);
+        }
+
+        public static List<BindingExpressionInfo> GetBindingExpressions(this DependencyObject parent, UpdateSourceTrigger[] triggers)
+        {
+            // Create a list of framework elements and binding expressions
+            var bindingExpressions = new List<BindingExpressionInfo>();
 
             // Get all explict bindings into the list
-            GetExplicitBindingExpressions(parent, ref bindingExpressions);
+            GetBindingExpressions(parent, triggers, ref bindingExpressions);
 
             return bindingExpressions;
         }
 
-        private static void GetExplicitBindingExpressions(DependencyObject parent, ref Dictionary<FrameworkElement, BindingExpression> bindingExpressions)
+        private static void GetBindingExpressions(DependencyObject parent, UpdateSourceTrigger[] triggers, ref List<BindingExpressionInfo> bindingExpressions)
         {
             // Get the number of children
-            int childCount = VisualTreeHelper.GetChildrenCount(parent);
+            var childCount = VisualTreeHelper.GetChildrenCount(parent);
 
             // Loop over each child
-            for (int childIndex = 0; childIndex < childCount; childIndex++)
+            for (var childIndex = 0; childIndex < childCount; childIndex++)
             {
                 // Get the child
-                DependencyObject dependencyObject = VisualTreeHelper.GetChild(parent, childIndex);
+                var dependencyObject = VisualTreeHelper.GetChild(parent, childIndex);
 
                 // Check if the object is a tab control
                 if (dependencyObject is TabControl)
                 {
                     // Cast the tab control
-                    TabControl tabControl = (dependencyObject as TabControl);
+                    var tabControl = (dependencyObject as TabControl);
 
                     // Loop over each tab
                     foreach (TabItem tabItem in tabControl.Items)
-                        GetExplicitBindingExpressions((DependencyObject) tabItem.Content, ref bindingExpressions);
+                        GetBindingExpressions((DependencyObject) tabItem.Content, triggers, ref bindingExpressions);
                 }
                 else
                 {
-                    // See if the child is a framework element
-                    if (dependencyObject is FrameworkElement)
-                    {
-                        // Cast to framework element
-                        FrameworkElement frameworkElement = (FrameworkElement) dependencyObject;
+                    // Cast to framework element
+                    var frameworkElement = dependencyObject as FrameworkElement;
 
+                    if (frameworkElement != null)
+                    {
                         // Get the list of properties
-                        IEnumerable<DependencyProperty> dependencyProperties = (from PropertyDescriptor propertyDescriptor in TypeDescriptor.GetProperties(dependencyObject)
+                        IEnumerable<DependencyProperty> dependencyProperties = (from PropertyDescriptor propertyDescriptor in TypeDescriptor.GetProperties(frameworkElement)
                                                                                 select DependencyPropertyDescriptor.FromProperty(propertyDescriptor)
                                                                                     into dependencyPropertyDescriptor
                                                                                     where dependencyPropertyDescriptor != null
                                                                                     select dependencyPropertyDescriptor.DependencyProperty).ToList();
 
                         // Loop over each dependency property in the list
-                        foreach (DependencyProperty dependencyProperty in dependencyProperties)
+                        foreach (var dependencyProperty in dependencyProperties)
                         {
                             // Try to get the binding expression for the property
-                            BindingExpression bindingExpression = frameworkElement.GetBindingExpression(dependencyProperty);
+                            var bindingExpression = frameworkElement.GetBindingExpression(dependencyProperty);
 
                             // If there is a binding expression and it is set to explicit then make it update the source
-                            if (bindingExpression != null && bindingExpression.ParentBinding.UpdateSourceTrigger == UpdateSourceTrigger.Explicit)
-                                bindingExpressions.Add(frameworkElement, bindingExpression);
+                            if (bindingExpression != null && (triggers == null || triggers.Contains(bindingExpression.ParentBinding.UpdateSourceTrigger)))
+                                bindingExpressions.Add(new BindingExpressionInfo(frameworkElement, bindingExpression));
                         }
                     }
 
                     // If the dependency object has any children then check them
                     if (VisualTreeHelper.GetChildrenCount(dependencyObject) > 0)
-                        GetExplicitBindingExpressions(dependencyObject, ref bindingExpressions);
+                        GetBindingExpressions(dependencyObject, triggers, ref bindingExpressions);
                 }
             }
 
         }
 
-        public static void UpdateAllSources(this DependencyObject window)
-        {
-            UpdateAllSources(window, GetExplicitBindingExpressions(window).Values);
-        }
-
-        public static void UpdateAllSources(this DependencyObject window, IEnumerable<BindingExpression> bindingExpressions)
+        public static void UpdateAllSources(this DependencyObject window, IEnumerable<BindingExpressionInfo> bindingExpressions)
         {
             foreach (var expression in bindingExpressions)
-                expression.UpdateSource();
+                expression.BindingExpression.UpdateSource();
         }
 
-        public static void ClearAllValidationErrors(this DependencyObject window)
-        {
-            ClearAllValidationErrors(window, GetExplicitBindingExpressions(window).Values);
-        }
-
-        public static void ClearAllValidationErrors(this DependencyObject window, IEnumerable<BindingExpression> bindingExpressions)
+        public static void ClearAllValidationErrors(this DependencyObject window, IEnumerable<BindingExpressionInfo> bindingExpressions)
         {
             foreach (var expression in bindingExpressions)
-                Validation.ClearInvalid(expression);
+                Validation.ClearInvalid(expression.BindingExpression);
+        }
+
+        public static bool Validate(this Window window)
+        {
+            // Get a list of all framework elements and binding expressions
+            var bindingExpressions = window.GetBindingExpressions();
+
+            // Loop over each binding expression and clear any existing error
+            window.ClearAllValidationErrors(bindingExpressions);
+
+            // Force all explicit bindings to update the source
+            window.UpdateAllSources(bindingExpressions);
+
+            // See if there are any errors
+            var hasError = bindingExpressions.Any(b => b.BindingExpression.HasError);
+
+            // If there was an error then set focus to the bad controls
+            if (hasError)
+            {
+                // Get the first framework element with an error
+                var firstErrorElement = bindingExpressions.First(b => b.BindingExpression.HasError).FrameworkElement;
+
+                // Set focus
+                firstErrorElement.Focus();
+            }
+
+            return !hasError;
         }
 
     }
