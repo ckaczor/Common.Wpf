@@ -80,10 +80,12 @@
                                           Direction="315"
                                           BlurRadius="4" />
                     </Border.Effect>
+                    <!-- ReSharper disable Xaml.BindingWithContextNotResolved -->
                     <TextBlock Text="{Binding ElementName=adorner, Path=AdornedElement.(Validation.Errors).CurrentItem.ErrorContent}"
                                Foreground="White"
                                Margin="8,3,8,3"
                                TextWrapping="Wrap" />
+                    <!-- ReSharper restore Xaml.BindingWithContextNotResolved -->
                 </Border>
             </Popup>
         </StackPanel>
