@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Resources;
 using System.Windows.Data;
 
-namespace Common.Wpf
+namespace Common.Wpf.Resource
 {
     public class EnumToResourceConverter : IValueConverter
     {

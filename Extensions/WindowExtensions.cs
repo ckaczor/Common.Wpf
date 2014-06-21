@@ -102,7 +102,7 @@ namespace Common.Wpf.Extensions
         public static void ClearAllValidationErrors(this DependencyObject window, IEnumerable<BindingExpressionInfo> bindingExpressions)
         {
             foreach (var expression in bindingExpressions)
-                Validation.ClearInvalid(expression.BindingExpression);
+                System.Windows.Controls.Validation.ClearInvalid(expression.BindingExpression);
         }
 
         public static bool Validate(this Window window)

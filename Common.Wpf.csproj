@@ -154,7 +154,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CheckedListItem.cs" />
-    <Compile Include="EnumToResourceConverter.cs" />
+    <Compile Include="Resource\EnumToResourceConverter.cs" />
     <Compile Include="ExtendedListBoxControl\ExtendedListBox.cs" />
     <Compile Include="ExtendedListBoxControl\ExtendedListBoxItem.cs" />
     <Compile Include="Extensions\ApplicationExtensions.cs" />
@@ -181,7 +181,7 @@
     <Compile Include="HtmlLabelControl\TextFragmentStyle.cs" />
     <Compile Include="HtmlLabelControl\TextParser.cs" />
     <AppDesigner Include="Properties\" />
-    <Compile Include="RepositionPopupBehavior.cs" />
+    <Compile Include="Validation\RepositionPopupBehavior.cs" />
     <Compile Include="TextListControl\TextList.xaml.cs">
       <DependentUpon>TextList.xaml</DependentUpon>
     </Compile>
@@ -190,6 +190,7 @@
       <DependentUpon>ImageButton.xaml</DependentUpon>
     </Compile>
     <Compile Include="Toolbar\SplitButton\SplitButton.cs" />
+    <Compile Include="Validation\ValidationModelBase.cs" />
     <Compile Include="Windows\ControlBox.cs" />
     <Compile Include="Windows\SnappingWindow.cs" />
     <Compile Include="Windows\WindowInformation.cs" />
@@ -221,7 +222,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="ValidationResources.xaml">
+    <Page Include="Validation\ValidationResources.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

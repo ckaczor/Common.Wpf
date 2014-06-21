@@ -1,7 +1,7 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:i="http://schemas.microsoft.com/expression/2010/interactivity"
-                    xmlns:wpf="clr-namespace:Common.Wpf">
+                    xmlns:validation="clr-namespace:Common.Wpf.Validation">
     <ControlTemplate x:Key="ValidationTemplate">
         <StackPanel Orientation="Horizontal">
             <!-- Defines TextBox outline border and the ToolTipCorner -->
@@ -39,7 +39,7 @@
                    PlacementRectangle="10,-1,0,0">
                 <!-- Used to reposition Popup when dialog moves or resizes -->
                 <i:Interaction.Behaviors>
-                    <wpf:RepositionPopupBehavior />
+                    <validation:RepositionPopupBehavior />
                 </i:Interaction.Behaviors>
                 <Popup.Style>
                     <Style TargetType="{x:Type Popup}">

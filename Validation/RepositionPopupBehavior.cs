@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interactivity;
 
-namespace Common.Wpf
+namespace Common.Wpf.Validation
 {
     /// <summary>
     /// Defines the reposition behavior of a <see cref="Popup"/> control when the window to which it is attached is moved or resized.
