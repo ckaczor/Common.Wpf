@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Security;
 using System.Windows;
 using System.Windows.Media;
 using System.Xml;
@@ -16,6 +17,9 @@ namespace Common.Wpf.HtmlLabelControl
         {
             _parentControl = parentControl;
 
+            // Escape the supplied text
+            text = SecurityElement.Escape(text);
+
             // Add a root tag so the parser is happy
             text = string.Format(CultureInfo.InvariantCulture, "<body>{0}</body>", text);
 
@@ -23,22 +27,21 @@ namespace Common.Wpf.HtmlLabelControl
             text = text.Replace("\r\n", "\n");
 
             // Create an XML document and load it with the text
-            XmlDocument xmlDocument = new XmlDocument();
-            xmlDocument.PreserveWhitespace = true;
+            var xmlDocument = new XmlDocument { PreserveWhitespace = true };
             xmlDocument.LoadXml(text);
 
             // Create a list of text lines
-            Collection<TextLine> lines = new Collection<TextLine>();
+            var lines = new Collection<TextLine>();
 
             // Walk over the nodes and build up the fragment list
-            walkNodes(xmlDocument.ChildNodes, lines);
+            WalkNodes(xmlDocument.ChildNodes, lines);
 
             return lines;
         }
 
         private readonly Stack<TextFragmentStyle> _attributeStack = new Stack<TextFragmentStyle>();
 
-        private void walkNodes(XmlNodeList xmlNodeList, Collection<TextLine> textLines)
+        private void WalkNodes(XmlNodeList xmlNodeList, Collection<TextLine> textLines)
         {
             if (textLines.Count == 0)
                 textLines.Add(new TextLine());
@@ -53,19 +56,18 @@ namespace Common.Wpf.HtmlLabelControl
                     case "#TEXT":
 
                         // Split the fragment and the line endings
-                        string[] lines = xmlNode.Value.Split('\n');
+                        var lines = xmlNode.Value.Split('\n');
 
-                        bool firstLine = true;
+                        var firstLine = true;
 
-                        foreach (string line in lines)
+                        foreach (var line in lines)
                         {
-                            TextLine textLine = (firstLine ? textLines[textLines.Count - 1] : new TextLine());
+                            var textLine = (firstLine ? textLines[textLines.Count - 1] : new TextLine());
 
                             // Create a new fragment and fill the style information
-                            TextFragment textFragment = new TextFragment(_parentControl);
-                            textFragment.Text = line;
+                            var textFragment = new TextFragment(_parentControl) { Text = line };
 
-                            foreach (TextFragmentStyle s in _attributeStack)
+                            foreach (var s in _attributeStack)
                             {
                                 s.Apply(textFragment);
                             }
@@ -105,26 +107,30 @@ namespace Common.Wpf.HtmlLabelControl
                     case "FONT":
                         style = new TextFragmentStyle();
 
-                        foreach (XmlAttribute attribute in xmlNode.Attributes)
+                        if (xmlNode.Attributes != null)
                         {
-                            switch (attribute.Name.ToUpperInvariant())
+                            foreach (XmlAttribute attribute in xmlNode.Attributes)
                             {
-                                case "SIZE":
-                                    style.Size = Convert.ToDouble(attribute.Value, CultureInfo.InvariantCulture);
-                                    break;
+                                switch (attribute.Name.ToUpperInvariant())
+                                {
+                                    case "SIZE":
+                                        style.Size = Convert.ToDouble(attribute.Value, CultureInfo.InvariantCulture);
+                                        break;
 
-                                case "COLOR":
-                                    style.Color = (Brush) new BrushConverter().ConvertFromString(attribute.Value);
-                                    break;
+                                    case "COLOR":
+                                        style.Color = (Brush) new BrushConverter().ConvertFromString(attribute.Value);
+                                        break;
+                                }
                             }
+
+                            _attributeStack.Push(style);
                         }
 
-                        _attributeStack.Push(style);
                         break;
                 }
 
                 if (xmlNode.ChildNodes.Count > 0)
-                    walkNodes(xmlNode.ChildNodes, textLines);
+                    WalkNodes(xmlNode.ChildNodes, textLines);
 
                 if (_attributeStack.Count > 0)
                     _attributeStack.Pop();
