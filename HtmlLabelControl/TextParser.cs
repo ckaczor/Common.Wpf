@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Security;
 using System.Windows;
 using System.Windows.Media;
 using System.Xml;
@@ -16,9 +15,6 @@ namespace Common.Wpf.HtmlLabelControl
         public Collection<TextLine> Parse(HtmlLabel parentControl, string text)
         {
             _parentControl = parentControl;
-
-            // Escape the supplied text
-            text = SecurityElement.Escape(text);
 
             // Add a root tag so the parser is happy
             text = string.Format(CultureInfo.InvariantCulture, "<body>{0}</body>", text);
