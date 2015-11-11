@@ -158,6 +158,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CheckedListItem.cs" />
+    <Compile Include="Extensions\IconExtensions.cs" />
     <Compile Include="Resource\EnumToResourceConverter.cs" />
     <Compile Include="ExtendedListBoxControl\ExtendedListBox.cs" />
     <Compile Include="ExtendedListBoxControl\ExtendedListBoxItem.cs" />
@@ -195,6 +196,10 @@
     </Compile>
     <Compile Include="Toolbar\SplitButton\SplitButton.cs" />
     <Compile Include="Validation\ValidationModelBase.cs" />
+    <Compile Include="Windows\CategoryPanel.cs" />
+    <Compile Include="Windows\CategoryWindow.xaml.cs">
+      <DependentUpon>CategoryWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Windows\ControlBox.cs" />
     <Compile Include="Windows\SnappingWindow.cs" />
     <Compile Include="Windows\WindowInformation.cs" />
@@ -230,6 +235,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Windows\CategoryWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
@@ -257,6 +266,7 @@
   <ItemGroup>
     <None Include="ChrisKaczor.pfx" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
