@@ -5,7 +5,7 @@ namespace Common.Wpf.Windows
 {
     public class CategoryPanel : UserControl
     {
-        private object Data { get; set; }
+        protected object Data { get; private set; }
 
         public virtual void LoadPanel(object data)
         {
