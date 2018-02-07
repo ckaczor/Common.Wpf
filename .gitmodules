@@ -1,0 +1,3 @@
+[submodule "Common.Native"]
+	path = Common.Native
+	url = https://github.com/ckaczor/Common.Native.git
